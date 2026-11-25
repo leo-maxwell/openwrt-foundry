@@ -1,0 +1,42 @@
+# Deployment values come from .env.
+checks = ["lan_dhcp_pool", "dropbear_ed25519_key"]
+
+[inputs]
+SYSTEM_HOSTNAME = { type = "string", pattern = "[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?" }
+SYSTEM_TIMEZONE = { type = "timezone" }
+SYSTEM_LANGUAGE = { type = "string" }
+SYSTEM_NTP_SERVERS = { type = "list", min_items = 1 }
+SSH_AUTHORIZED_KEYS = { type = "list", min_items = 1 }
+LAN_IPV4_CIDR = { type = "ipv4_interface" }
+LAN_DHCP_START = { type = "integer", min = 1 }
+LAN_DHCP_LIMIT = { type = "integer", min = 1 }
+WAN_INTERFACE = { type = "string" }
+WAN_VLAN_ID = { type = "integer", required = false, min = 1, max = 4094 }
+DNS_SERVERS = { type = "ip_list", required = false }
+IPV6_WAN_PD_REQUEST_LENGTH = { type = "integer", required = false, min = 1, max = 64 }
+IPV6_DOWNSTREAM_PD_LENGTH = { type = "integer", min = 1, max = 64 }
+USB_UUID = { type = "uuid" }
+USB_MOUNT_OPTIONS = { type = "string" }
+LOG_ROTATION_TIME = { type = "time" }
+LOG_LEVEL = { type = "string", choices = ["emerg", "alert", "crit", "err", "warning", "notice", "info", "debug"] }
+LOG_RESERVE_BYTES = { type = "integer", min = 1000000000 }
+REBOOT_ENABLED = { type = "boolean" }
+REBOOT_FREQUENCY = { type = "string", when = { REBOOT_ENABLED = true }, choices = ["daily", "weekly"] }
+REBOOT_TIME = { type = "time", when = { REBOOT_ENABLED = true } }
+PPPOE_USERNAME = { type = "string" }
+PPPOE_PASSWORD = { type = "string" }
+ADMIN_PASSWORD_HASH = { type = "string" }
+SSH_HOST_PRIVATE_KEY_B64 = { type = "base64" }
+
+[inputs.REBOOT_DAY_OF_WEEK]
+type = "string"
+when = { REBOOT_ENABLED = true, REBOOT_FREQUENCY = "weekly" }
+choices = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"]
+
+[files."/etc/dropbear/authorized_keys"]
+lines_from = "SSH_AUTHORIZED_KEYS"
+mode = "0600"
+
+[files."/etc/dropbear/dropbear_ed25519_host_key"]
+bytes_from = "SSH_HOST_PRIVATE_KEY_B64"
+mode = "0600"
