@@ -1,6 +1,6 @@
 # OpenWrt Foundry
 
-Build reproducible, immutable OpenWrt firmware from a public profile and one private deployment file. The [stable profile](PROFILE_STABLE.md) defines the NanoPi R4S production configuration and hardware acceptance tests.
+Build reproducible, immutable OpenWrt firmware from a public profile and one private deployment file. The [stable profile](PROFILE_STABLE.md) defines production routing behavior and hardware acceptance tests. The NanoPi R4S is the reference deployment.
 
 ## Configuration
 
@@ -25,8 +25,10 @@ mode = "0644"
 
 1. **Validate.** Use Python 3.11 or later and its standard-library TOML reader. Run `python3 scripts/parser.py --profile stable --env .env.example` to check the public example. Reject duplicate or undeclared deployment keys, missing required values, and failed constraints. Report errors without printing credentials.
 2. **Render.** Add `--output <new-directory>` to render declared files. Paths inside this private directory match paths on the router. File rules write text, one list entry per line, or decoded bytes and apply the declared permissions. OpenWrt configuration generation must preserve literal values when encoding UCI. Keep the source `.env` outside the firmware.
-3. **Assemble.** The build entry point is specified as `./build.sh --profile <name>` on a replaceable x86-64 Linux host. Select the latest stable OpenWrt release when updating the lockfile. Pin the release, device profile, tool and package versions, and checksums for subsequent builds. Pass the rendered directory to the official ImageBuilder as `FILES` and embed it in SquashFS. Use the full OpenWrt build system when a boot component requires rebuilding.
+3. **Assemble.** The build entry point is `./build.sh --profile <name>` on a replaceable x86-64 Linux host. Select the latest stable OpenWrt release when updating the lockfile. Use the deployment’s `OPENWRT_TARGET` (target/subtarget) to select the ImageBuilder and verify that its profile list contains `OPENWRT_DEVICE_PROFILE`. Pass that ID as ImageBuilder’s `PROFILE`. Pin the hardware selection, release, tool and package versions, and checksums for subsequent builds. Pass the rendered directory to the official ImageBuilder as `FILES` and embed it in SquashFS. Use the full OpenWrt build system when a boot component requires rebuilding.
 4. **Verify and release.** Unpack the image and check its target, filesystem, generated files, and permissions. Reproduce the image and configuration on a clean builder using the same source revision, locked dependencies, and deployment file. Tag releases and produce a flashable image, package manifest, and SHA-256 checksum.
+
+See the [Fedora build instructions](BUILD.md) for local preflight, tool requirements, and test image verification.
 
 ## Production builds
 

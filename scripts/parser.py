@@ -6,6 +6,7 @@ import ipaddress
 import json
 from pathlib import Path, PurePosixPath
 import re
+import subprocess
 from tempfile import TemporaryDirectory
 import tomllib
 from uuid import UUID
@@ -51,6 +52,39 @@ def read_env(path, inputs):
     return values
 
 
+def validate_public_key(line):
+    fields = line.split(None, 2)
+    if len(fields) < 2:
+        raise ValueError
+    algorithm, encoded = fields[:2]
+    blob = base64.b64decode(encoded, validate=True)
+    tag = algorithm.encode("ascii")
+    if not blob.startswith(len(tag).to_bytes(4, "big") + tag):
+        raise ValueError
+    result = subprocess.run(
+        ["ssh-keygen", "-l", "-f", "-"],
+        input=f"{algorithm} {encoded}\n".encode(),
+        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+    )
+    if result.returncode != 0:
+        raise ValueError
+
+
+def validate_shadow_hash(value):
+    alphabet = r"[./0-9A-Za-z]"
+    sha = re.fullmatch(
+        rf"[$]([56])[$](?:rounds=[1-9][0-9]{{3,8}}[$])?{alphabet}{{0,16}}[$]({alphabet}+)",
+        value,
+    )
+    if sha and len(sha[2]) == {"5": 43, "6": 86}[sha[1]]:
+        return
+    if re.fullmatch(rf"[$]1[$]{alphabet}{{0,8}}[$]{alphabet}{{22}}", value):
+        return
+    if re.fullmatch(rf"[$]2[aby][$](?:0[4-9]|[12][0-9]|3[01])[$]{alphabet}{{53}}", value):
+        return
+    raise ValueError
+
+
 def convert(raw, spec):
     kind = spec["type"]
     if kind == "integer":
@@ -62,7 +96,7 @@ def convert(raw, spec):
         return value
     if kind == "boolean":
         return {"true": True, "false": False}[raw]
-    if kind in ("list", "ip_list"):
+    if kind in ("list", "ip_list", "ssh_key_list"):
         items = json.loads(raw)
         if not isinstance(items, list) or len(items) < spec.get("min_items", 0):
             raise ValueError
@@ -71,7 +105,12 @@ def convert(raw, spec):
                 raise ValueError
             if kind == "ip_list":
                 ipaddress.ip_address(item)
+            if kind == "ssh_key_list":
+                validate_public_key(item)
         return items
+    if kind == "shadow_hash":
+        validate_shadow_hash(raw)
+        return raw
     if kind == "base64":
         return base64.b64decode(raw, validate=True)
     if kind == "ipv4_interface":

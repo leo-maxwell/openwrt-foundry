@@ -1,22 +1,27 @@
-# Stable profile for NanoPi R4S
+# Stable routing profile
 
 The [project specification](SPEC.md) defines the shared build process. The [stable profile](../profiles/stable.toml) declares the inputs below.
 
 Build a router that restores its declared configuration and resumes routing automatically after power loss. The target is 120 days without an unplanned service interruption. Scheduled reboots are acceptable.
 
-Target the latest stable OpenWrt release for the NanoPi R4S (RK3399, `rockchip/armv8`). Confirm release, device profile, and ImageBuilder availability before implementation.
+The NanoPi R4S (RK3399) is the reference deployment. For each device, verify its boot layout, network port mapping, USB storage, and hardware watchdog against the selected release. Run the acceptance tests on that hardware.
 
 ## Runtime and configuration
 
-- Boot from microSD with a read-only SquashFS root and a tmpfs overlay. Keep the card read-only throughout startup and operation. Disable writable `rootfs_data`, extroot, and swap. Rebooting discards temporary LuCI changes and restores the configuration baked into the image.
+- Boot from the device’s system storage (microSD on the R4S) with a read-only SquashFS root and a tmpfs overlay. Keep system storage read-only throughout startup and operation. Disable writable `rootfs_data`, extroot, and swap. Rebooting discards temporary LuCI changes and restores the configuration baked into the image.
 - The production `stable` profile provides routing, PPPoE, NAT, firewall, DHCP, DNS, IPv6, NTP, SSH, and LuCI. Retain native `procd`, `netifd`, and the hardware watchdog. The stable profile enables IPv4 masquerading on WAN, permits LAN-to-WAN forwarding, and blocks unsolicited WAN access except for explicitly allowed traffic. Disable automatic updates. The initial stable profile leaves flow offloading disabled pending performance and stability testing. Reserve optional services for the separate `plugins` profile.
-- Request an IPv6 prefix from the ISP via DHCPv6-PD. On the R4S LAN, advertise the default route and a /64 for SLAAC. Offer stateful DHCPv6 address assignment (IA_NA) on the same link.
-- Delegate a distinct, nonoverlapping prefix to each requesting downstream router via DHCPv6-PD (IA_PD). Route each prefix through the router that received it, so that router can manage its own subnets and its clients have native IPv6 connectivity without NAT66. Update advertisements, delegations, and routes when the ISP prefix changes. If there is too little space for a grant, preserve the R4S LAN /64 and report the shortage. Resume delegation when space becomes available.
+- Request an IPv6 prefix from the ISP via DHCPv6-PD. On the router LAN, advertise the default route and a /64 for SLAAC. Offer stateful DHCPv6 address assignment (IA_NA) on the same link.
+- Delegate a distinct, nonoverlapping prefix to each requesting downstream router via DHCPv6-PD (IA_PD). Route each prefix through the router that received it, so that router can manage its own subnets and its clients have native IPv6 connectivity without NAT66. Update advertisements, delegations, and routes when the ISP prefix changes. If there is too little space for a grant, preserve the router LAN /64 and report the shortage. Resume delegation when space becomes available.
 - Support optional daily or weekly reboots at a configured local time and weekday where applicable. An incorrect clock must never cause a reboot loop.
 
 ## Firmware inputs
 
 Supply these values in the deployment .env file. Enter local times as unquoted 24-hour values from `00:00` through `23:59`.
+
+### Hardware selection
+
+- `OPENWRT_TARGET` — Required OpenWrt target/subtarget, such as `rockchip/armv8`.
+- `OPENWRT_DEVICE_PROFILE` — Required device ID in that target’s ImageBuilder, such as `friendlyarm_nanopi-r4s`. The parser checks identifier syntax. The build must confirm that the selected release offers this combination.
 
 ### System and access
 
@@ -24,7 +29,7 @@ Supply these values in the deployment .env file. Enter local times as unquoted 2
 - `SYSTEM_TIMEZONE` — IANA time zone name used for schedules and log dates.
 - `SYSTEM_LANGUAGE` — LuCI language code supported by the image.
 - `SYSTEM_NTP_SERVERS` — Nonempty list of NTP server hostnames or IP addresses.
-- `SSH_AUTHORIZED_KEYS` — List of administrator public keys, one OpenSSH public key per entry.
+- `SSH_AUTHORIZED_KEYS` — List of administrator public keys, one OpenSSH public key per entry (algorithm, Base64 key, and optional comment). The builder checks each key with OpenSSH’s `ssh-keygen`.
 
 ### LAN and WAN
 
@@ -61,7 +66,7 @@ Include these four inputs in the same private `.env` as the other deployment val
 
 - `PPPOE_USERNAME` — Account name exactly as supplied by the ISP.
 - `PPPOE_PASSWORD` — Original ISP password, including any spaces or punctuation.
-- `ADMIN_PASSWORD_HASH` — Complete OpenWrt-compatible shadow password hash for the administrator account.
+- `ADMIN_PASSWORD_HASH` — Complete modular crypt hash for the administrator account. The parser checks SHA-512-crypt, SHA-256-crypt, MD5-crypt, and bcrypt (2a, 2b, 2y) syntax. The example uses SHA-512-crypt.
 - `SSH_HOST_PRIVATE_KEY_B64` — Single-line Base64 encoding of the complete Dropbear Ed25519 host private key. Reuse it across builds to preserve device identity.
 
 ## USB logging
@@ -74,8 +79,8 @@ Use native OpenWrt logging and a dedicated ext4 USB drive mounted by UUID. Assum
 
 ## Acceptance
 
-- Verify the overlay, first-boot scripts, host key handling, and random initialization against the target release. Confirm zero microSD writes at boot and in steady state.
+- Verify the overlay, first-boot scripts, host key handling, and random initialization against the target release. Confirm zero writes to system storage at boot and in steady state.
 - Pass at least 50 abrupt power cuts, including under heavy traffic and during PPPoE dialing. Recover configuration and connectivity automatically without filesystem repair.
 - Exercise USB removal, exhaustion, and I/O failure while routing. Verify IPv4, SSH, LuCI, PPPoE reconnection, and watchdog recovery.
-- On the R4S LAN, verify SLAAC and stateful DHCPv6 address assignment with both services enabled. Behind a downstream router, verify that a client receives an address from the delegated prefix and reaches the IPv6 Internet using that address. Repeat after ISP renumbering. With only one ISP-provided /64, verify that the R4S LAN stays online, the shortage is reported, and downstream delegation recovers once sufficient space returns.
+- On the router LAN, verify SLAAC and stateful DHCPv6 address assignment with both services enabled. Behind a downstream router, verify that a client receives an address from the delegated prefix and reaches the IPv6 Internet using that address. Repeat after ISP renumbering. With only one ISP-provided /64, verify that the router LAN stays online, the shortage is reported, and downstream delegation recovers once sufficient space returns.
 - Complete an initial 30-day stability run, then demonstrate the 120-day target.

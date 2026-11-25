@@ -1,0 +1,5 @@
+release = "25.12.6"
+
+# From the release target's official sha256sums file.
+[targets."rockchip/armv8"]
+imagebuilder_sha256 = "cfee81dcfd592a4c28941c2aabf098ccb84d0bd4d2c2eae779bd6e210ae9ddfe"

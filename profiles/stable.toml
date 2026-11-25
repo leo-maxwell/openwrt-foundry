@@ -2,11 +2,13 @@
 checks = ["lan_dhcp_pool", "dropbear_ed25519_key"]
 
 [inputs]
+OPENWRT_TARGET = { type = "string", pattern = "[a-z0-9][a-z0-9_-]*/[a-z0-9][a-z0-9_-]*" }
+OPENWRT_DEVICE_PROFILE = { type = "string", pattern = "[A-Za-z0-9][A-Za-z0-9._+-]*" }
 SYSTEM_HOSTNAME = { type = "string", pattern = "[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?" }
 SYSTEM_TIMEZONE = { type = "timezone" }
 SYSTEM_LANGUAGE = { type = "string" }
 SYSTEM_NTP_SERVERS = { type = "list", min_items = 1 }
-SSH_AUTHORIZED_KEYS = { type = "list", min_items = 1 }
+SSH_AUTHORIZED_KEYS = { type = "ssh_key_list", min_items = 1 }
 LAN_IPV4_CIDR = { type = "ipv4_interface" }
 LAN_DHCP_START = { type = "integer", min = 1 }
 LAN_DHCP_LIMIT = { type = "integer", min = 1 }
@@ -25,7 +27,7 @@ REBOOT_FREQUENCY = { type = "string", when = { REBOOT_ENABLED = true }, choices 
 REBOOT_TIME = { type = "time", when = { REBOOT_ENABLED = true } }
 PPPOE_USERNAME = { type = "string" }
 PPPOE_PASSWORD = { type = "string" }
-ADMIN_PASSWORD_HASH = { type = "string" }
+ADMIN_PASSWORD_HASH = { type = "shadow_hash" }
 SSH_HOST_PRIVATE_KEY_B64 = { type = "base64" }
 
 [inputs.REBOOT_DAY_OF_WEEK]
